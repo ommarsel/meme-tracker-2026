@@ -1,64 +1,100 @@
 import streamlit as st
 import pandas as pd
+import requests
 
-# Judul Aplikasi
-st.set_page_config(page_title="Meme-Watch 2026 Insider", layout="wide")
-st.title("🚀 Meme-Watch 2026: Smart Money Tracker")
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Meme-Watch Ultra 2026", layout="wide", page_icon="⚡")
 
-# 1. Dashboard Watchlist Listing
-st.header("📋 Watchlist Listing Bursa Besar")
-data_listing = {
-    "Koin": ["PIPPIN", "PENGU", "GOAT", "MOCHI", "SPX6900", "PNUT", "SUDENG", "FARTCOIN", "MIU", "BRETT"],
-    "Jaringan": ["Solana", "Ethereum", "Solana", "Base", "Eth/Sol", "Solana", "Sui", "Solana", "Sui", "Base"],
-    "Potensi Listing": ["Sangat Tinggi", "Tinggi (Coinbase)", "Sangat Tinggi", "Tinggi (Base)", "Global Expansion", "Medium", "High (Sui Eco)", "Medium", "High", "High"],
-    "Status Smart Money": ["Akumulasi", "Holding", "Accumulation", "Whale Buy", "Stable", "Re-entry", "Accumulation", "Day Trading", "Holding", "Holding"]
-}
-df_listing = pd.DataFrame(data_listing)
-st.table(df_listing)
+# --- CSS UNTUK TAMPILAN PREMIUM ---
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 2. Database Alamat Dompet Smart Money (BARU)
-st.header("🐋 Smart Money Wallet Watchlist")
-st.write("Pantau dompet ini di Arkham atau Explorer untuk melihat apa yang mereka beli selanjutnya.")
+# --- FUNGSI SEARCH AUTOMATIC DATA ---
+@st.cache_data(ttl=60) # Data otomatis refresh setiap 1 menit
+def fetch_trending_data(symbols):
+    results = []
+    for sym in symbols:
+        try:
+            url = f"https://api.dexscreener.com/latest/dex/search?q={sym}"
+            res = requests.get(url).json()
+            pairs = res.get('pairs', [])
+            if pairs:
+                # Ambil pair dengan likuiditas tertinggi untuk menghindari scam
+                best_pair = max(pairs, key=lambda x: x.get('liquidity', {}).get('usd', 0))
+                results.append({
+                    "Koin": best_pair['baseToken']['symbol'],
+                    "Harga": f"${float(best_pair['priceUsd']):.6f}",
+                    "Perubahan 24h": f"{best_pair.get('priceChange', {}).get('h24', 0)}%",
+                    "Likuiditas": f"${best_pair['liquidity']['usd']:,.0f}",
+                    "Volume": f"${best_pair['volume']['h24']:,.0f}",
+                    "Jaringan": best_pair['chainId'].upper(),
+                    "Contract Address": best_pair['baseToken']['address'],
+                    "Link": best_pair['url']
+                })
+        except:
+            continue
+    return results
 
-smart_money_data = {
-    "Nama Whale": ["Pippin OG Whale", "Goat Alpha Trader", "SPX Institutional", "Sui Meme Hunter"],
-    "Network": ["Solana", "Solana", "Ethereum", "Sui"],
-    "Address": [
-        "7nB8...v4Yh (Copy to Arkham)", 
-        "49bk...k92p (Copy to Arkham)", 
-        "0x3d...dE4f (Copy to Arkham)",
-        "0x7b...31ae (Copy to Arkham)"
-    ],
-    "Cek Transaksi": [
-        "https://solscan.io/", 
-        "https://solscan.io/", 
-        "https://etherscan.io/",
-        "https://suiscan.xyz/"
-    ]
-}
-df_smart = pd.DataFrame(smart_money_data)
-st.dataframe(df_smart, use_container_width=True)
+# --- DATA AWAL (DAFTAR SMART MONEY TARGET) ---
+target_list = ["PIPPIN", "GOAT", "PENGU", "SPX6900", "FARTCOIN", "MOCHI", "POPCAT", "PNUT", "MOODENG", "BRETT"]
 
-# 3. Alat Pantau Eksternal
-st.header("🔍 Alat Investigasi On-Chain")
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.info("Arkham Intelligence")
-    st.markdown("[Buka Arkham](https://platform.arkhamintelligence.com/)")
-with col2:
-    st.info("Bubblemaps (Struktur Holder)")
-    st.markdown("[Buka Bubblemaps](https://bubblemaps.io/)")
-with col3:
-    st.info("DexScreener (Real-time Chart)")
-    st.markdown("[Buka DexScreener](https://dexscreener.com/)")
+# --- UI UTAMA ---
+st.title("⚡ Meme-Watch Ultra-Auto 2026")
+st.write(f"Sistem bekerja otomatis memantau Blockchain • **Live: {pd.Timestamp.now().strftime('%H:%M:%S')}**")
 
-# 4. Form Peringatan (Simulasi)
-st.sidebar.header("🔔 Atur Notifikasi")
-target_coin = st.sidebar.selectbox("Pilih Koin:", df_listing["Koin"])
-alert_type = st.sidebar.radio("Tipe Alert:", ["Listing Baru", "Whale Buy > $50k", "Harga Naik 20%"])
+# 1. LIVE PERFORMANCE METRICS
+st.header("📊 Performa Pasar Real-Time")
+live_data = fetch_trending_data(target_list)
 
-if st.sidebar.button("Aktifkan Alert"):
-    st.sidebar.success(f"Alert untuk {target_coin} ({alert_type}) AKTIF!")
+if live_data:
+    df = pd.DataFrame(live_data)
+    
+    # Tampilkan 3 Koin Terbaik di Baris Atas
+    top_3 = df.sort_values(by="Perubahan 24h", ascending=False).head(3)
+    cols = st.columns(3)
+    for i, (_, row) in enumerate(top_3.iterrows()):
+        with cols[i]:
+            st.metric(label=f"{row['Koin']} ({row['Jaringan']})", value=row['Harga'], delta=row['Perubahan 24h'])
+            st.caption(f"Liq: {row['Likuiditas']}")
 
-# 5. Tips Keamanan
-st.warning("⚠️ Tips: Jika dompet Whale di atas tiba-tiba mengirim koin dalam jumlah besar ke Bursa (Binance/Bybit), itu tandanya mereka akan JUAL (Take Profit).")
+    st.divider()
+
+    # 2. TABEL OTOMATIS LENGKAP
+    st.header("📋 Daftar Pantauan Smart Money (Auto-Update)")
+    st.dataframe(
+        df[['Koin', 'Jaringan', 'Harga', 'Perubahan 24h', 'Volume', 'Likuiditas', 'Contract Address']],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # 3. LINK COPY CONTRACT (MEMUDAHKAN SWAP DI HP)
+    st.subheader("🔗 Salin Kontrak & Analisis")
+    for _, row in df.iterrows():
+        with st.expander(f"Opsi untuk {row['Koin']}"):
+            st.code(row['Contract Address'], language="text")
+            st.markdown(f"[📈 Lihat Grafik Real-Time]({row['Link']})")
+            st.markdown(f"[🛡️ Cek Keamanan (RugCheck)](https://www.rugcheck.xyz/mainnet/token/{row['Contract Address']})")
+
+# 4. FITUR TAMBAH KOIN MANUAL (SIDEBAR)
+st.sidebar.header("🔍 Cari Koin Baru")
+new_coin = st.sidebar.text_input("Ketik Nama/Simbol Koin:")
+if new_coin:
+    custom_res = fetch_trending_data([new_coin])
+    if custom_res:
+        st.sidebar.success(f"Ditemukan: {custom_res[0]['Harga']}")
+        st.sidebar.write(f"CA: `{custom_res[0]['Contract Address']}`")
+    else:
+        st.sidebar.error("Koin tidak ditemukan.")
+
+st.sidebar.divider()
+if st.sidebar.button("🔄 Paksa Update Data"):
+    st.cache_data.clear()
+    st.rerun()
+
+# --- FOOTER ---
+st.divider()
+st.info("💡 **Tips Android:** Buka aplikasi ini di Chrome HP, pilih 'Instal Aplikasi' agar muncul di menu HP Anda tanpa bar browser.")
